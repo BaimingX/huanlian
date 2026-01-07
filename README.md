@@ -1,30 +1,55 @@
-# React + TypeScript + Vite
+# Huanlian (Face Swap App)
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+A desktop application built with Electron, React, and MediaPipe that enables real-time face swapping, avatar overlay, and background replacement.
 
-Currently, two official plugins are available:
+## 🚀 Features
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react/README.md) uses [Babel](https://babeljs.io/) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+- **Real-time Face Swapping**: Detects faces in the webcam feed and swaps them with a user-uploaded target face.
+- **Avatar Overlay**: Supports 3D avatar overlay on the user's face.
+- **Background Replacement**: Remove or replace the video background with a custom image.
+- **Multi-Backend Support**: Toggle between different rendering backends (D3D11, D3D9, OpenGL, Vulkan) for optimal performance.
+- **Privacy Focused**: All processing happens locally on your device.
 
-## Expanding the ESLint configuration
+## 🛠️ Tech Stack
 
-If you are developing a production application, we recommend updating the configuration to enable type aware lint rules:
+- **Frontend**: React, TailwindCSS
+- **Desktop Framework**: Electron, Vite
+- **Computer Vision**: Google MediaPipe (Face Landmarker, Selfie Segmentation)
+- **3D Graphics**: Three.js, React Three Fiber
 
-- Configure the top-level `parserOptions` property like this:
+## 📦 Installation
 
-```js
-export default {
-  // other rules...
-  parserOptions: {
-    ecmaVersion: 'latest',
-    sourceType: 'module',
-    project: ['./tsconfig.json', './tsconfig.node.json'],
-    tsconfigRootDir: __dirname,
-  },
-}
-```
+1. **Clone the repository**
+   ```bash
+   git clone https://github.com/BaimingX/huanlian.git
+   cd huanlian
+   ```
 
-- Replace `plugin:@typescript-eslint/recommended` to `plugin:@typescript-eslint/recommended-type-checked` or `plugin:@typescript-eslint/strict-type-checked`
-- Optionally add `plugin:@typescript-eslint/stylistic-type-checked`
-- Install [eslint-plugin-react](https://github.com/jsx-eslint/eslint-plugin-react) and add `plugin:react/recommended` & `plugin:react/jsx-runtime` to the `extends` list
+2. **Install dependencies**
+   ```bash
+   npm install
+   ```
+
+3. **Start Development Server**
+   ```bash
+   npm run dev
+   ```
+
+4. **Build for Production**
+   ```bash
+   npm run build
+   ```
+
+## 🎮 Usage
+
+1. Launch the application.
+2. Grant camera permissions.
+3. Use the sidebar controls to:
+    - Upload a target face for face swapping.
+    - Upload a background image.
+    - Toggle between Avatar and Face Swap modes.
+    - Adjust performance settings.
+
+## 📄 License
+
+[MIT](LICENSE)

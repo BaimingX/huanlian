@@ -12,6 +12,7 @@ let allowGpuFallback = true;
 let gpuBackend: GpuBackend = 'd3d11';
 let ignoreGpuBlocklist = false;
 let disableGpuSandbox = false;
+let preventMinimizeForObs = true;
 let rendererReady = false;
 let gpuFallbackTimer: ReturnType<typeof setTimeout> | null = null;
 try {
@@ -22,6 +23,7 @@ try {
     gpuBackend?: GpuBackend;
     ignoreGpuBlocklist?: boolean;
     disableGpuSandbox?: boolean;
+    preventMinimizeForObs?: boolean;
   };
   if (parsed.renderMode === 'gpu' || parsed.renderMode === 'cpu') {
     renderMode = parsed.renderMode;
@@ -44,6 +46,9 @@ try {
   if (typeof parsed.disableGpuSandbox === 'boolean') {
     disableGpuSandbox = parsed.disableGpuSandbox;
   }
+  if (typeof parsed.preventMinimizeForObs === 'boolean') {
+    preventMinimizeForObs = parsed.preventMinimizeForObs;
+  }
 } catch {
   // Ignore missing/invalid settings and use defaults.
 }
@@ -52,7 +57,11 @@ const persistRenderMode = () => {
   try {
     fs.writeFileSync(
       settingsPath,
-      JSON.stringify({ renderMode, allowGpuFallback, gpuBackend, ignoreGpuBlocklist, disableGpuSandbox }, null, 2),
+      JSON.stringify(
+        { renderMode, allowGpuFallback, gpuBackend, ignoreGpuBlocklist, disableGpuSandbox, preventMinimizeForObs },
+        null,
+        2
+      ),
       'utf-8'
     );
   } catch (error) {
@@ -171,6 +180,15 @@ function createWindow() {
     }
   })
   win.webContents.setBackgroundThrottling?.(false)
+  win.setMinimizable(!preventMinimizeForObs);
+
+  win.on('minimize', (event) => {
+    if (!preventMinimizeForObs || !win) {
+      return;
+    }
+    event.preventDefault();
+    win.showInactive();
+  });
 
   if (VITE_DEV_SERVER_URL) {
     win.loadURL(VITE_DEV_SERVER_URL)
@@ -209,6 +227,7 @@ electron.ipcMain.handle('app:get-gpu-fallback', () => allowGpuFallback);
 electron.ipcMain.handle('app:get-gpu-backend', () => gpuBackend);
 electron.ipcMain.handle('app:get-ignore-gpu-blocklist', () => ignoreGpuBlocklist);
 electron.ipcMain.handle('app:get-disable-gpu-sandbox', () => disableGpuSandbox);
+electron.ipcMain.handle('app:get-prevent-minimize', () => preventMinimizeForObs);
 electron.ipcMain.handle('app:set-render-mode', (_event, mode: RenderMode) => {
   if (mode === 'cpu' || mode === 'gpu') {
     renderMode = mode;
@@ -250,6 +269,21 @@ electron.ipcMain.handle('app:set-ignore-gpu-blocklist', (_event, enabled: boolea
 electron.ipcMain.handle('app:set-disable-gpu-sandbox', (_event, enabled: boolean) => {
   if (typeof enabled === 'boolean') {
     disableGpuSandbox = enabled;
+    persistRenderMode();
+    return true;
+  }
+  return false;
+});
+electron.ipcMain.handle('app:set-prevent-minimize', (_event, enabled: boolean) => {
+  if (typeof enabled === 'boolean') {
+    preventMinimizeForObs = enabled;
+    if (win && !win.isDestroyed()) {
+      win.setMinimizable(!enabled);
+      if (enabled && win.isMinimized()) {
+        win.restore();
+        win.showInactive();
+      }
+    }
     persistRenderMode();
     return true;
   }

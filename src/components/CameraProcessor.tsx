@@ -5,7 +5,7 @@ import { ImageSegmenterResult, type FaceLandmarkerResult } from '@mediapipe/task
 import type { FaceBox, FrameSize, FaceSnapshot } from '../types/face';
 import { computeFaceBox } from '../utils/face';
 import { AvatarOverlay } from './AvatarOverlay';
-import { Settings, User, Image as ImageIcon, ExternalLink, Box, FlipHorizontal, Cpu } from 'lucide-react';
+import { Settings, User, Image as ImageIcon, ExternalLink, Box, FlipHorizontal, Cpu, Monitor } from 'lucide-react';
 
 export function CameraProcessor() {
     const { videoRef, error } = useCamera();
@@ -42,9 +42,11 @@ export function CameraProcessor() {
     const [gpuBackend, setGpuBackend] = useState<'d3d11' | 'd3d9' | 'opengl' | 'vulkan' | 'desktop'>('d3d11');
     const [ignoreGpuBlocklist, setIgnoreGpuBlocklist] = useState(false);
     const [disableGpuSandbox, setDisableGpuSandbox] = useState(false);
+    const [preventMinimizeForObs, setPreventMinimizeForObs] = useState(true);
 
     // Ref to pass data to 3D scene without re-renders
     const faceSnapshotRef = useRef<FaceSnapshot | null>(null);
+    const lastVideoTimeRef = useRef(-1);
     // Assets
     const [backgroundImage, setBackgroundImage] = useState<HTMLImageElement | null>(null);
     const [faceOverlayImage, setFaceOverlayImage] = useState<HTMLImageElement | null>(null);
@@ -120,10 +122,40 @@ export function CameraProcessor() {
             .catch((error) => {
                 console.warn('Failed to read GPU sandbox setting:', error);
             });
+        ipc.invoke('app:get-prevent-minimize')
+            .then((value) => {
+                if (!active) return;
+                if (typeof value === 'boolean') {
+                    setPreventMinimizeForObs(value);
+                }
+            })
+            .catch((error) => {
+                console.warn('Failed to read minimize behavior:', error);
+            });
         return () => {
             active = false;
         };
     }, []);
+
+    useEffect(() => {
+        const handleVisible = () => {
+            if (document.visibilityState === 'visible') {
+                lastVideoTimeRef.current = -1;
+                const video = videoRef.current;
+                if (video && video.paused) {
+                    video.play().catch(() => {
+                        // Ignore play errors when resuming.
+                    });
+                }
+            }
+        };
+        document.addEventListener('visibilitychange', handleVisible);
+        window.addEventListener('focus', handleVisible);
+        return () => {
+            document.removeEventListener('visibilitychange', handleVisible);
+            window.removeEventListener('focus', handleVisible);
+        };
+    }, [videoRef]);
 
     useEffect(() => {
         try {
@@ -299,7 +331,6 @@ export function CameraProcessor() {
 
     useEffect(() => {
         let animationFrameId: number;
-        let lastVideoTime = -1;
 
         const renderLoop = () => {
             const video = videoRef.current;
@@ -308,14 +339,16 @@ export function CameraProcessor() {
             if (video && canvas && video.readyState >= 2 && !isInitializing && !initError) {
                 const ctx = canvas.getContext('2d', { willReadFrequently: true });
                 if (ctx) {
-                    if (canvas.width !== video.videoWidth || canvas.height !== video.videoHeight) {
+                    if (video.videoWidth > 0 && video.videoHeight > 0
+                        && (canvas.width !== video.videoWidth || canvas.height !== video.videoHeight)
+                    ) {
                         canvas.width = video.videoWidth;
                         canvas.height = video.videoHeight;
                     }
                     frameSizeRef.current = { width: canvas.width, height: canvas.height };
 
-                    if (video.currentTime !== lastVideoTime) {
-                        lastVideoTime = video.currentTime;
+                    if (video.currentTime !== lastVideoTimeRef.current) {
+                        lastVideoTimeRef.current = video.currentTime;
                         const startTimeMs = performance.now();
                         const service = MediaPipeService.getInstance();
 
@@ -423,6 +456,17 @@ export function CameraProcessor() {
             const ok = await window.ipcRenderer.invoke('app:set-disable-gpu-sandbox', nextValue);
             if (ok) {
                 setNeedsRestart(true);
+            }
+        }
+    };
+
+    const handlePreventMinimizeToggle = async () => {
+        const nextValue = !preventMinimizeForObs;
+        setPreventMinimizeForObs(nextValue);
+        if (window.ipcRenderer?.invoke) {
+            const ok = await window.ipcRenderer.invoke('app:set-prevent-minimize', nextValue);
+            if (!ok) {
+                setPreventMinimizeForObs((current) => !current);
             }
         }
     };
@@ -601,6 +645,20 @@ export function CameraProcessor() {
                             <span>Disable GPU Sandbox</span>
                         </div>
                         <div className={`w-2 h-2 rounded-full ${disableGpuSandbox ? 'bg-amber-400' : 'bg-gray-600'}`} />
+                    </button>
+
+                    <button
+                        onClick={handlePreventMinimizeToggle}
+                        className={`w-full flex items-center justify-between px-4 py-3 rounded-xl transition-all border ${preventMinimizeForObs
+                            ? 'bg-sky-600/20 border-sky-500/50 text-sky-200'
+                            : 'bg-gray-800 border-gray-700 text-gray-300 hover:bg-gray-750'
+                            }`}
+                    >
+                        <div className="flex items-center gap-3">
+                            <Monitor size={20} />
+                            <span>Prevent Minimize (OBS)</span>
+                        </div>
+                        <div className={`w-2 h-2 rounded-full ${preventMinimizeForObs ? 'bg-sky-400' : 'bg-gray-600'}`} />
                     </button>
 
                     {needsRestart && (
